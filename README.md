@@ -12,9 +12,14 @@ The APP performs an endless loop, where it samples the PPG sensor, and every 204
 
 The cDD provides access to the virtual PPG sensor. Each time the read function of the cDD is invoked, a pre-defined value is provided to the user application.
 
-## How to test
+## How to use
 
-Assuming a pocky Linux distribution has already been built and setup on your machine and you have already created a layer called ```meta-example``` ,  act as following:
+Assuming that you already 
+
+-  built and setup a Pocky Linux distribution on your machine for raspberrypi4 or qemuarm
+-  created a layer called ```meta-example``` and  a directory called ```recipes-example``` inside it to store your recipes
+
+open up a new terminal and act as follows:
 
 ```bash
 cd poky
@@ -44,11 +49,15 @@ KERNEL_MODULE_AUTOLOAD += "ppgmod"
 
 Eventually, build the new image
 
-```bitbake core-image-minimal```
+```bash
+bitbake core-image-minimal
+```
 
 and test the application running ```app``` from the command user interface.
 
 ## Timing
+
+A sampling of 50 Hz is equal to 20 ms period. Therefore, 
 
 ## Memory Usage
 
