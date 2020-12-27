@@ -16,10 +16,71 @@ The cDD provides access to the virtual PPG sensor. Each time the read function o
 
 Assuming that you already 
 
--  built and setup a Pocky Linux distribution on your machine for raspberrypi4 or qemuarm
+-  built and setup a ```pocky``` Linux distribution on your machine for Raspberry Pi 4 or qemuarm
 -  created a layer called ```meta-example``` and  a directory called ```recipes-example``` inside it to store your recipes
 
-open up a new terminal and act as follows:
+open up a new terminal and act as follows, according to what target you want to the test it on (rpi or qemuarm).
+
+### Raspberry Pi 4
+
+```bash
+cd poky
+source oe-init-build-env build_rpi4
+```
+
+then, clone this repository as follows
+
+```bash
+cd ../meta-example/recipes-example/
+git clone https://github.com/PronElle/OSESAssignment
+```
+
+At this point, application and the kernel module need to be added to the Linux distro configurations
+
+```bash
+vi ../../build_rpi4/conf/local.conf
+```
+
+and add the following lines at the end of the file
+
+```bash
+IMAGE_INSTALL_append = " app"
+IMAGE_INSTALL_append = " ppgmod"
+KERNEL_MODULE_AUTOLOAD += "ppgmod"
+```
+
+Then, the layer needs to be added to the Linux distro
+
+```
+vi ../../build_rpi4/conf/bblayers.conf
+```
+
+and replace its content with the following lines
+
+```bash
+BBPATH = "${TOPDIR}"
+BBFILES ?= ""
+BBLAYERS ?= " \
+    /opt/poky/meta \
+    /opt/poky/meta-poky \
+    /opt/poky/meta-yocto-bsp \
+    /opt/poky/meta-openembedded/meta-oe \
+    /opt/poky/meta-openembedded/meta-multimedia \
+    /opt/poky/meta-openembedded/meta-networking \
+    /opt/poky/meta-openembedded/meta-python \
+    /opt/poky/meta-raspberrypi \
+    "
+```
+
+Eventually, build the new image
+
+```bash
+bitbake core-image-full-cmdline
+```
+
+and test the application running ```app``` from the command user interface.
+
+### Quemuarm 
 
 ```bash
 cd poky
@@ -53,11 +114,18 @@ Eventually, build the new image
 bitbake core-image-minimal
 ```
 
-and test the application running ```app``` from the command user interface.
+and run ```quemuarm```
+
+```bash
+runqemu qemuarm
+```
+
+test the application typing ```app``` from the command user interface.
 
 ## Timing
 
-A sampling of 50 Hz is equal to 20 ms period. Therefore, 
+A sampling frequency of 50 Hz is equal to 20 ms sampling period. To ensure the proper timing, an alarm-based approach relying on ```SIGALARM``` was employed. This solution is rather better than a sleep-based approach because it both  reduces CPU usage and improves timing // TODO: to be explained better
 
 ## Memory Usage
 
+//TODO: to be written

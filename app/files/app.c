@@ -4,8 +4,11 @@
 #include <stdlib.h>
 #include "data.h"
 
-#define q	11		    /* for 2^11 points */
+#define q	11		/* for 2^11 points */
 #define N	(1<<q)		/* N-point FFT, iFFT */
+
+#define Ts      20          	/* sampling time [ms] */
+#define DEV     "/dev/ppgmod_dev" 
 
 typedef float real;
 typedef struct{real Re; real Im;} complex;

@@ -9,6 +9,8 @@
 #include <linux/device.h>
 #include <asm/uaccess.h>
 
+#include "data.h"
+
 static dev_t ppgmod_dev;
 struct cdev ppgmod_cdev;
 
@@ -18,8 +20,8 @@ static char buffer[64];
 
 ssize_t ppgmod_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos)
 {
-    printk(KERN_INFO "[ppgmod] read (count=%d, offset=%d)\n", (int)count, (int)*f_pos );
-
+   // printk(KERN_INFO "[ppgmod] read (count=%d, offset=%d)\n", (int)count, (int)*f_pos );
+   // TODO: to be implemented
     return count;
 }
 
