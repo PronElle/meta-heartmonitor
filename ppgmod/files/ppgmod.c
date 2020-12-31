@@ -15,14 +15,25 @@ static dev_t ppgmod_dev;
 struct cdev ppgmod_cdev;
 
 struct class *myclass = NULL;
-
 static char buffer[64];
+
+static int counter = 0;
 
 ssize_t ppgmod_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos)
 {
-   // printk(KERN_INFO "[ppgmod] read (count=%d, offset=%d)\n", (int)count, (int)*f_pos );
-   // TODO: to be implemented
-    return count;
+    int val = ppg[counter++];
+
+    copy_to_user((void*)buf, (void*)&(val), sizeof(int));
+    counter  %= 2048;
+    
+    printk(KERN_INFO "[ppgmod] read (value=%d, bufsize=%d)\n", val, counter);
+
+    return sizeof(int);
+}
+
+int ppgmod_open(struct inode *inodep, struct file *filep){
+    counter = 0;
+    return 0;
 }
 
 struct file_operations ppgmod_fops = {

@@ -35,7 +35,7 @@ cd ../meta-example/recipes-example/
 git clone https://github.com/PronElle/OSESAssignment
 ```
 
-At this point, application and the kernel module need to be added to the Linux distro configurations
+At this point, application and the kernel module need to be added to the Linux distro configurations. Edit the following file with your favorite text editor (```vi``` in the example)
 
 ```bash
 vi ../../build_rpi4/conf/local.conf
@@ -80,7 +80,7 @@ bitbake core-image-full-cmdline
 
 and test the application running ```app``` from the command user interface.
 
-### Quemuarm 
+### Qemuarm 
 
 ```bash
 cd poky
@@ -94,7 +94,7 @@ cd ../meta-example/recipes-example/
 git clone https://github.com/PronElle/OSESAssignment
 ```
 
-At this point, application and the kernel module need to be added to the Linux distro configurations
+At this point, application and the kernel module need to be added to the Linux distro configurations. Edit the following file with your favorite text editor (```vi``` in the example)
 
 ```bash
 vi ../../build_qemuarm/conf/local.conf
@@ -114,7 +114,7 @@ Eventually, build the new image
 bitbake core-image-minimal
 ```
 
-and run ```quemuarm```
+and run ```qemuarm```
 
 ```bash
 runqemu qemuarm
