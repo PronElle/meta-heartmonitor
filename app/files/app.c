@@ -2,22 +2,47 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "data.h"
+#include <string.h>
 
-#define q	11		/* for 2^11 points */
-#define N	(1<<q)		/* N-point FFT, iFFT */
+#include <errno.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <unistd.h>
 
-#define Ts      20          	/* sampling time [ms] */
-#define DEV     "/dev/ppgmod_dev" 
+#include <signal.h>
+#include <sys/time.h>
+#include <pthread.h>
+
+#define q	  11		    /* for 2^11 points */
+#define N 	(1<<q)		/* N-point FFT, iFFT */
+
+#define Ts  20          	/* sampling time [ms] */
+#define DEV "/dev/ppgmod_dev" /*device name*/
 
 typedef float real;
-typedef struct{real Re; real Im;} complex;
+typedef struct{ 
+   real Re; 
+   real Im;
+} complex;
 
 #ifndef PI
 # define PI	3.14159265358979323846264338327950288
 #endif
 
+pthread_t bpm_thread;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+static int fd = -1;
+int counter = 0;
+complex v[N];
 
+
+/**
+ *  @brief evaluates fast Fourier transform
+ *  @param v: 
+ *  @param n:
+ *  @param tmp:
+ **/ 
 void fft( complex *v, int n, complex *tmp )
 {
   if(n>1) {			/* otherwise, do nothing and return */
@@ -43,20 +68,23 @@ void fft( complex *v, int n, complex *tmp )
   return;
 }
 
-int main(void)
-{
-  complex v[N], scratch[N];
+
+/** 
+ *  @brief evaluates bpm using fft
+ *  @param 
+ *  @retval bpm
+ **/
+int bpm_compute(complex *v){
+	complex scratch[N];
   float abs[N];
-  int k;
-  int m;
-  int i;
+  int k, m, i;
   int minIdx, maxIdx;
 
 // Initialize the complex array for FFT computation
-  for(k=0; k<N; k++) {
-    v[k].Re = ppg[k];
-    v[k].Im = 0;
-  }
+  //for(k=0; k<N; k++) {
+  //  v[k].Re = ppg[k];
+  //  v[k].Im = 0;
+ // }
  
 // FFT computation
   fft( v, N, scratch );
@@ -73,11 +101,92 @@ int main(void)
   m = minIdx;
   for(k=minIdx; k<(maxIdx); k++) {
     if( abs[k] > abs[m] )
-	m = k;
+	    m = k;
   }
     
 // Print the heart beat in bpm
-  printf( "\n\n\n%d bpm\n\n\n", (m)*60*50/2048 );
+ return m*60*50/2048;
+}
+
+
+/**
+ *  @brief SIGN_INT Handler (Ctrl + C)
+ *         allowing user to stop execution
+ **/
+void CtrlHandler(){
+	printf("[INFO] Terminating");
+  close(fd);
+  pthread_cancel(bpm_thread);  
+  exit(EXIT_SUCCESS);
+}
+
+/**
+ * @brief setups a repetitive alarm every ts in ms
+ *        look at README for more
+ * @param ts : time in seconds
+ **/
+void setReAlarm(time_t ts){
+  struct itimerval itv;
+
+  itv.it_value.tv_sec = ts / 1000;
+  itv.it_value.tv_usec = ts * 1000;
+  itv.it_interval = itv.it_value; // repetitive
+
+  setitimer(ITIMER_REAL, &itv, NULL);
+  return;
+}
+
+void getSample(){  
+  read(fd, (char*)&v[counter].Re,sizeof(int));
+  v[counter++].Im = 0; 
+}
+
+
+
+void* calcThread(){
+    while(1){
+      pthread_mutex_lock(&mutex);
+      
+      if (counter == N){ // all samples gathered
+        counter = 0;
+        printf( "\n\n\n%d bpm\n\n\n", bpm_compute(v));
+      }
+
+      pthread_mutex_unlock(&mutex);
+    }
+}
+
+
+
+int main(void)
+{
+  printf("[INFO] Application started");
+
+  // attacching Ctrl + C to Handler
+  signal(SIGINT, CtrlHandler);
+
+  // opening driver file
+  if((fd = open(DEV,  O_RDWR)) < 0){
+    fprintf(stderr,"[ERROR] Unable to open %s\n: %s\n", DEV, strerror(errno));
+    exit(EXIT_FAILURE);
+  }
+
+  // creating thread 
+  if(pthread_create(&bpm_thread, NULL, calcThread, NULL) != 0){
+    fprintf(stderr,"[ERROR] Unable to create thread: %s\n", strerror(errno));
+    exit(EXIT_FAILURE);
+  }
+
+  // attach SIGALARM to Handler
+  if(signal(SIGALRM, getSample) == SIG_ERR){
+    fprintf(stderr, "[ERROR] Unable to handle SIGALARM: %s", strerror(errno));
+    exit(EXIT_FAILURE);
+  }
+
+  // set ripetitive alarm every Ts ms
+  setReAlarm(Ts);
+
+  while(1) pause();
 
   exit(EXIT_SUCCESS);
 }

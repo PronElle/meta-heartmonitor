@@ -35,7 +35,7 @@ cd ../meta-example/recipes-example/
 git clone https://github.com/PronElle/OSESAssignment
 ```
 
-At this point, application and the kernel module need to be added to the Linux distro configurations. Edit the following file with your favorite text editor (```vi``` in the example)
+At this point, application and the kernel module need to be added to the Linux distro configurations. Edit the following file with your favorite text editor, e.g. ```vi``` 
 
 ```bash
 vi ../../build_rpi4/conf/local.conf
@@ -94,7 +94,7 @@ cd ../meta-example/recipes-example/
 git clone https://github.com/PronElle/OSESAssignment
 ```
 
-At this point, application and the kernel module need to be added to the Linux distro configurations. Edit the following file with your favorite text editor (```vi``` in the example)
+At this point, application and the kernel module need to be added to the Linux distro configurations. Edit the following file with your favorite text editor, e.g. ```vi``` 
 
 ```bash
 vi ../../build_qemuarm/conf/local.conf
@@ -124,7 +124,21 @@ test the application typing ```app``` from the command user interface.
 
 ## Timing
 
-A sampling frequency of 50 Hz is equal to 20 ms sampling period. To ensure the proper timing, an alarm-based approach relying on ```SIGALARM``` was employed. This solution is rather better than a sleep-based approach because it both  reduces CPU usage and improves timing // TODO: to be explained better
+A sampling frequency of 50 Hz is equal to 20 ms sampling period. To ensure the proper timing, an alarm-based approach relying on ```SIGALARM``` and ```setitimer``` function was employed.
+
+Timer values are defined by the following structures
+
+```C
+struct itimerval {
+    struct timeval it_interval; /* next value */
+    struct timeval it_value;    /* current value */
+};
+
+struct timeval {
+    time_t      tv_sec;         /* seconds */
+    suseconds_t tv_usec;        /* microseconds */
+};
+```
 
 ## Memory Usage
 
