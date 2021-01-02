@@ -18,7 +18,6 @@
 #define N 	(1<<q)		/* N-point FFT, iFFT */
 
 #define Ts  20          	/* sampling time [ms] */
-#define DEV "/dev/ppgmod_dev" /*device name*/
 
 typedef float real;
 typedef struct{ 
@@ -31,7 +30,7 @@ typedef struct{
 #endif
 
 pthread_t bpm_thread;
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex;
 static int fd = -1;
 int counter = 0;
 complex v[N];
@@ -39,22 +38,26 @@ complex v[N];
 
 /**
  *  @brief evaluates fast Fourier transform
- *  @param v: 
- *  @param n:
- *  @param tmp:
+ *  @param v: array of samples
+ *  @param n: number of samples
+ *  @param tmp
  **/ 
 void fft( complex *v, int n, complex *tmp )
 {
-  if(n>1) {			/* otherwise, do nothing and return */
-    int k,m;    complex z, w, *vo, *ve;
+  if(n > 1) {			/* otherwise, do nothing and return */
+    int k, m;    
+    complex z, w, *vo, *ve;
     ve = tmp; vo = tmp+n/2;
+ 
     for(k=0; k<n/2; k++) {
       ve[k] = v[2*k];
       vo[k] = v[2*k+1];
     }
+ 
     fft( ve, n/2, v );		/* FFT on even-indexed elements of v[] */
     fft( vo, n/2, v );		/* FFT on odd-indexed elements of v[] */
-    for(m=0; m<n/2; m++) {
+ 
+    for(m = 0; m < n/2; m++) {
       w.Re = cos(2*PI*m/(double)n);
       w.Im = -sin(2*PI*m/(double)n);
       z.Re = w.Re*vo[m].Re - w.Im*vo[m].Im;	/* Re(w*vo[m]) */
@@ -71,7 +74,7 @@ void fft( complex *v, int n, complex *tmp )
 
 /** 
  *  @brief evaluates bpm using fft
- *  @param 
+ *  @param v: array of samples
  *  @retval bpm
  **/
 int bpm_compute(complex *v){
@@ -79,12 +82,6 @@ int bpm_compute(complex *v){
   float abs[N];
   int k, m, i;
   int minIdx, maxIdx;
-
-// Initialize the complex array for FFT computation
-  //for(k=0; k<N; k++) {
-  //  v[k].Re = ppg[k];
-  //  v[k].Im = 0;
- // }
  
 // FFT computation
   fft( v, N, scratch );
@@ -111,13 +108,14 @@ int bpm_compute(complex *v){
 
 /**
  *  @brief SIGN_INT Handler (Ctrl + C)
- *         allowing user to stop execution
+ *         allowing user to stop execution.
  **/
-void CtrlHandler(){
+void SignIntHandler(){
 	printf("[INFO] Terminating");
   close(fd);
-  pthread_cancel(bpm_thread);  
-  exit(EXIT_SUCCESS);
+  pthread_cancel(bpm_thread); 
+  pthread_mutex_destroy(&mutex); 
+  exit(EXIT_SUCCESS); 
 }
 
 /**
@@ -136,7 +134,11 @@ void setReAlarm(time_t ts){
   return;
 }
 
-void getSample(){  
+/**
+ * @brief SIGALRM Handler: accesses drive file 
+ *        to get a sample every 20 ms
+ **/
+void sampleHandler(){  
   read(fd, (char*)&v[counter].Re,sizeof(int));
   v[counter++].Im = 0; 
 }
@@ -149,7 +151,7 @@ void* calcThread(){
       
       if (counter == N){ // all samples gathered
         counter = 0;
-        printf( "\n\n\n%d bpm\n\n\n", bpm_compute(v));
+        printf( "bpm: %d\n", bpm_compute(v));
       }
 
       pthread_mutex_unlock(&mutex);
@@ -160,14 +162,15 @@ void* calcThread(){
 
 int main(void)
 {
+  char* dev_name = "dev/ppgmod_dev";
   printf("[INFO] Application started");
 
   // attacching Ctrl + C to Handler
-  signal(SIGINT, CtrlHandler);
+  signal(SIGINT, SignIntHandler);
 
   // opening driver file
-  if((fd = open(DEV,  O_RDWR)) < 0){
-    fprintf(stderr,"[ERROR] Unable to open %s\n: %s\n", DEV, strerror(errno));
+  if((fd = open(dev_name,  O_RDWR)) < 0){
+    fprintf(stderr,"[ERROR] Unable to open %s\n: %s\n", dev_name, strerror(errno));
     exit(EXIT_FAILURE);
   }
 
@@ -177,9 +180,15 @@ int main(void)
     exit(EXIT_FAILURE);
   }
 
+  // creating mutex
+   if (pthread_mutex_init(&mutex, NULL) != 0) { 
+        fprintf(stderr,"[ERROR] Unable to create mutex: %s\n", strerror(errno));
+        exit(EXIT_FAILURE); 
+    } 
+
   // attach SIGALARM to Handler
-  if(signal(SIGALRM, getSample) == SIG_ERR){
-    fprintf(stderr, "[ERROR] Unable to handle SIGALARM: %s", strerror(errno));
+  if(signal(SIGALRM, sampleHandler) == SIG_ERR){
+    fprintf(stderr, "[ERROR] Unable to handle SIGALARM: %s\n", strerror(errno));
     exit(EXIT_FAILURE);
   }
 

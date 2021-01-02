@@ -26,15 +26,11 @@ ssize_t ppgmod_read(struct file *filp, char __user *buf, size_t count, loff_t *f
     copy_to_user((void*)buf, (void*)&(val), sizeof(int));
     counter  %= 2048;
     
-    printk(KERN_INFO "[ppgmod] read (value=%d, bufsize=%d)\n", val, counter);
+    printk(KERN_INFO "[ppgmod] read (value=%d, bufsize=%d)\n", val, sizeof(int));
 
     return sizeof(int);
 }
 
-int ppgmod_open(struct inode *inodep, struct file *filep){
-    counter = 0;
-    return 0;
-}
 
 struct file_operations ppgmod_fops = {
     .owner = THIS_MODULE,
