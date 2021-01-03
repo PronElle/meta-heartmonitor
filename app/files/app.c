@@ -15,9 +15,9 @@
 #include <pthread.h>
 
 #define q	  11		    /* for 2^11 points */
-#define N 	(1<<q)		/* N-point FFT, iFFT */
+#define N 	(1 << q)	/* N-point FFT, iFFT */
 
-#define Ts  20          	/* sampling time [ms] */
+#define Ts  0x4E20     /* sampling time [us] */
 
 typedef float real;
 typedef struct{ 
@@ -119,15 +119,15 @@ void SignIntHandler(){
 }
 
 /**
- * @brief setups a repetitive alarm every ts in ms
+ * @brief setups a repetitive alarm every ts in us
  *        look at README for more
  * @param ts : time in seconds
  **/
 void setReAlarm(time_t ts){
   struct itimerval itv;
 
-  itv.it_value.tv_sec = ts / 1000;
-  itv.it_value.tv_usec = ts * 1000;
+  itv.it_value.tv_usec = ts ;
+  itv.it_value.tv_sec = ts / 1000000;
   itv.it_interval = itv.it_value; // repetitive
 
   setitimer(ITIMER_REAL, &itv, NULL);
@@ -139,12 +139,15 @@ void setReAlarm(time_t ts){
  *        to get a sample every 20 ms
  **/
 void sampleHandler(){  
-  read(fd, (char*)&v[counter].Re,sizeof(int));
+  read(fd, (char*)&(v[counter].Re), sizeof(int));
   v[counter++].Im = 0; 
 }
 
 
-
+/**
+ *  @brief when all samples gather, displays bpm
+ *         uses  a mutex for synch
+ **/
 void* calcThread(){
     while(1){
       pthread_mutex_lock(&mutex);
