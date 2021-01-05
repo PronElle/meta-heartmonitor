@@ -8,7 +8,7 @@
 #include <linux/cdev.h>
 #include <linux/device.h>
 #include <asm/uaccess.h>
-
+#include <linux/uaccess.h>
 #include <linux/mutex.h>
 
 #include "data.h"
@@ -29,14 +29,14 @@ ssize_t ppgmod_read(struct file *filp, char __user *buf, size_t count, loff_t *f
 {
     int val = ppg[counter++];
 
-    if(copy_to_user((void*)buf, (void*)&(val), count)){
+    if(copy_to_user((void*)buf, (void*)&(val), sizeof(int))){
         printk(KERN_INFO "failed to send value to the user\n");
         return -EFAULT;
     }
     counter  %= 2048;
     
     printk(KERN_INFO "[ppgmod] read value=%d\n", val);
-    return count;
+    return sizeof(int);
 }
 
 

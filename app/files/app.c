@@ -17,7 +17,7 @@
 #define q	  11		    /* for 2^11 points */
 #define N 	(1 << q)	/* N-point FFT, iFFT */
 
-#define Ts  0x4E20     /* sampling time [us] */
+#define Ts  20     /* sampling time [us] */
 
 typedef float real;
 typedef struct{ 
@@ -29,8 +29,12 @@ typedef struct{
 # define PI	3.14159265358979323846264338327950288
 #endif
 
-pthread_t bpm_thread;
-pthread_mutex_t mutex;
+typedef struct{
+	pthread_t id;
+	complex v[N];
+}mythread_s;
+
+
 static int fd = -1;
 int counter = 0;
 complex v[N];
@@ -73,14 +77,13 @@ void fft( complex *v, int n, complex *tmp )
 
 
 /** 
- *  @brief evaluates bpm using fft
+ *  @brief thread function to evaluate bpm using fft
  *  @param v: array of samples
- *  @retval bpm
  **/
-int bpm_compute(complex *v){
-	complex scratch[N];
+void* bpm_thread(complex *v){
+  complex scratch[N];
   float abs[N];
-  int k, m, i;
+  int k, m;
   int minIdx, maxIdx;
  
 // FFT computation
@@ -100,9 +103,9 @@ int bpm_compute(complex *v){
     if( abs[k] > abs[m] )
 	    m = k;
   }
-    
-// Print the heart beat in bpm
- return m*60*50/2048;
+
+  // Print the heart beat in bpm
+  printf("bpm: %d\n", m*60*50/2048);
 }
 
 
@@ -111,11 +114,10 @@ int bpm_compute(complex *v){
  *         allowing user to stop execution.
  **/
 void SignIntHandler(){
-	printf("[INFO] Terminating");
-  close(fd);
-  pthread_cancel(bpm_thread); 
-  pthread_mutex_destroy(&mutex); 
-  exit(EXIT_SUCCESS); 
+  printf("[INFO] Terminating Program\n");
+  if(fd != -1) close(fd); // if file was actually opened
+
+  exit(EXIT_SUCCESS);
 }
 
 /**
@@ -126,47 +128,50 @@ void SignIntHandler(){
 void setReAlarm(time_t ts){
   struct itimerval itv;
 
-  itv.it_value.tv_usec = ts ;
-  itv.it_value.tv_sec = ts / 1000000;
+  itv.it_value.tv_usec = ts *1000;
+  itv.it_value.tv_sec = ts / 1000;
   itv.it_interval = itv.it_value; // repetitive
 
   setitimer(ITIMER_REAL, &itv, NULL);
   return;
 }
 
+
+
+
 /**
  * @brief SIGALRM Handler: accesses drive file 
  *        to get a sample every 20 ms
  **/
-void sampleHandler(){  
-  read(fd, (char*)&(v[counter].Re), sizeof(int));
-  v[counter++].Im = 0; 
-}
+void sampleHandler(){ 
+  int val ;
 
+  read(fd, (char*)&(val), sizeof(int));
+  //printf("[INFO] read: %d\n", val);
 
-/**
- *  @brief when all samples gather, displays bpm
- *         uses  a mutex for synch
- **/
-void* calcThread(){
-    while(1){
-      pthread_mutex_lock(&mutex);
-      
-      if (counter == N){ // all samples gathered
-        counter = 0;
-        printf( "bpm: %d\n", bpm_compute(v));
-      }
+  v[counter].Re = val;
+  v[counter++].Im = 0;
 
-      pthread_mutex_unlock(&mutex);
-    }
+  if(counter == N){ // if all samples gathered
+	  mythread_s thr;
+	  for(int i = 0; i < N; ++i) thr.v[i] = v[i]; // copying N samples
+
+	  // detaching a thread handling the N samples
+	  if(pthread_create(&(thr.id), NULL, (void*)bpm_thread, (void*)thr.v) != 0){
+	    fprintf(stderr,"[ERROR] Unable to create thread: %s\n", strerror(errno));
+	    exit(EXIT_FAILURE);
+	  }
+	  counter = 0;
+  }
+
 }
 
 
 
 int main(void)
 {
-  char* dev_name = "dev/ppgmod_dev";
-  printf("[INFO] Application started");
+  char* dev_name = "/dev/ppgmod_dev";
+  printf("[INFO] Application started\n");
 
   // attacching Ctrl + C to Handler
   signal(SIGINT, SignIntHandler);
@@ -177,23 +182,13 @@ int main(void)
     exit(EXIT_FAILURE);
   }
 
-  // creating thread 
-  if(pthread_create(&bpm_thread, NULL, calcThread, NULL) != 0){
-    fprintf(stderr,"[ERROR] Unable to create thread: %s\n", strerror(errno));
-    exit(EXIT_FAILURE);
-  }
-
-  // creating mutex
-   if (pthread_mutex_init(&mutex, NULL) != 0) { 
-        fprintf(stderr,"[ERROR] Unable to create mutex: %s\n", strerror(errno));
-        exit(EXIT_FAILURE); 
-    } 
 
   // attach SIGALARM to Handler
   if(signal(SIGALRM, sampleHandler) == SIG_ERR){
     fprintf(stderr, "[ERROR] Unable to handle SIGALARM: %s\n", strerror(errno));
     exit(EXIT_FAILURE);
   }
+
 
   // set ripetitive alarm every Ts ms
   setReAlarm(Ts);

@@ -6,7 +6,7 @@ S = "${WORKDIR}"
 
 do_compile() {
 	set CFLAGS -g
-	${CC} ${CFLAGS} app.c -lpthread -lm ${LDFLAGS} -o testmymod
+	${CC} ${CFLAGS} app.c -lpthread -lm ${LDFLAGS} -o app
 	unset CFLAGS
 }
 
