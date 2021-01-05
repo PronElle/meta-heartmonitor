@@ -14,30 +14,29 @@
 #include <sys/time.h>
 #include <pthread.h>
 
+
 #define q	  11		    /* for 2^11 points */
 #define N 	(1 << q)	/* N-point FFT, iFFT */
+#define Ts  0x4E20     /* sampling time [us] */
 
-#define Ts  20     /* sampling time [us] */
-
-typedef float real;
-typedef struct{ 
-   real Re; 
-   real Im;
-} complex;
 
 #ifndef PI
 # define PI	3.14159265358979323846264338327950288
 #endif
 
-typedef struct{
-	pthread_t id;
-	complex v[N];
-}mythread_s;
+typedef float real;
 
+typedef struct{ 
+   real Re; 
+   real Im;
+} complex;
 
-static int fd = -1;
-int counter = 0;
+/* shared vars */
 complex v[N];
+pthread_t bpm_thread_id;
+static int fd_pipe[2];
+static int fd = -1;
+unsigned short counter = 0;
 
 
 /**
@@ -78,34 +77,44 @@ void fft( complex *v, int n, complex *tmp )
 
 /** 
  *  @brief thread function to evaluate bpm using fft
- *  @param v: array of samples
- **/
-void* bpm_thread(complex *v){
+**/
+void* bpm_thread(){
   complex scratch[N];
   float abs[N];
-  int k, m;
+  int k, m, val;
   int minIdx, maxIdx;
+
+
+  while(1){
+	  read(fd_pipe[0], &val, sizeof(val)); // it's blocking !
+
+	  v[counter].Re = val;
+	  v[counter++].Im = 0;
+
+	  if(counter == N){ // if all samples gathered
+		  counter = 0;
+
+		// FFT computation
+		  fft( v, N, scratch );
+
+		// PSD computation
+		  for(k=0; k<N; k++)
+			abs[k] = (50.0/2048)*((v[k].Re*v[k].Re)+(v[k].Im*v[k].Im));
+
+		  minIdx = (0.5*2048)/50;   // position in the PSD of the spectral line corresponding to 30 bpm
+		  maxIdx = 3*2048/50;       // position in the PSD of the spectral line corresponding to 180 bpm
+
+		// Find the peak in the PSD from 30 bpm to 180 bpm
+		  m = minIdx;
+		  for(k=minIdx; k<(maxIdx); k++)
+			if( abs[k] > abs[m] ) m = k;
+
+		  // Print the heart beat in bpm
+		  printf("bpm: %d\n", m*60*50/2048);
+	  }
+ }
  
-// FFT computation
-  fft( v, N, scratch );
-
-// PSD computation
-  for(k=0; k<N; k++) {
-	abs[k] = (50.0/2048)*((v[k].Re*v[k].Re)+(v[k].Im*v[k].Im)); 
-  }
-
-  minIdx = (0.5*2048)/50;   // position in the PSD of the spectral line corresponding to 30 bpm
-  maxIdx = 3*2048/50;       // position in the PSD of the spectral line corresponding to 180 bpm
-
-// Find the peak in the PSD from 30 bpm to 180 bpm
-  m = minIdx;
-  for(k=minIdx; k<(maxIdx); k++) {
-    if( abs[k] > abs[m] )
-	    m = k;
-  }
-
-  // Print the heart beat in bpm
-  printf("bpm: %d\n", m*60*50/2048);
+  pthread_exit(NULL);
 }
 
 
@@ -114,22 +123,23 @@ void* bpm_thread(complex *v){
  *         allowing user to stop execution.
  **/
 void SignIntHandler(){
-  printf("[INFO] Terminating Program\n");
+  pthread_cancel(bpm_thread_id);
   if(fd != -1) close(fd); // if file was actually opened
 
+  printf("Terminating Program\n");
   exit(EXIT_SUCCESS);
 }
 
 /**
  * @brief setups a repetitive alarm every ts in us
  *        look at README for more
- * @param ts : time in seconds
+ * @param ts : time in us
  **/
 void setReAlarm(time_t ts){
   struct itimerval itv;
 
-  itv.it_value.tv_usec = ts *1000;
-  itv.it_value.tv_sec = ts / 1000;
+  itv.it_value.tv_usec = ts;
+  itv.it_value.tv_sec = ts / 1000000;
   itv.it_interval = itv.it_value; // repetitive
 
   setitimer(ITIMER_REAL, &itv, NULL);
@@ -146,24 +156,10 @@ void setReAlarm(time_t ts){
 void sampleHandler(){ 
   int val ;
 
-  read(fd, (char*)&(val), sizeof(int));
-  //printf("[INFO] read: %d\n", val);
+  read(fd, (char*)&(val), sizeof(int)); // reading for mod
+  write(fd_pipe[1], &val, sizeof(val)); // send to thread
 
-  v[counter].Re = val;
-  v[counter++].Im = 0;
-
-  if(counter == N){ // if all samples gathered
-	  mythread_s thr;
-	  for(int i = 0; i < N; ++i) thr.v[i] = v[i]; // copying N samples
-
-	  // detaching a thread handling the N samples
-	  if(pthread_create(&(thr.id), NULL, (void*)bpm_thread, (void*)thr.v) != 0){
-	    fprintf(stderr,"[ERROR] Unable to create thread: %s\n", strerror(errno));
-	    exit(EXIT_FAILURE);
-	  }
-	  counter = 0;
-  }
-
+  printf("read: %d\n", val);
 }
 
 
@@ -171,21 +167,32 @@ void sampleHandler(){
 int main(void)
 {
   char* dev_name = "/dev/ppgmod_dev";
-  printf("[INFO] Application started\n");
+  printf("Application started\n");
 
   // attacching Ctrl + C to Handler
   signal(SIGINT, SignIntHandler);
 
   // opening driver file
   if((fd = open(dev_name,  O_RDWR)) < 0){
-    fprintf(stderr,"[ERROR] Unable to open %s\n: %s\n", dev_name, strerror(errno));
+    fprintf(stderr,"Unable to open %s\n: %s\n", dev_name, strerror(errno));
     exit(EXIT_FAILURE);
   }
 
+  // creating the FIFO shared channel
+  if(pipe(fd_pipe) < 0){
+	  fprintf(stderr, "Unable to create FIFO channel: %s\n", strerror(errno));
+	  exit(EXIT_FAILURE);
+  }
 
   // attach SIGALARM to Handler
   if(signal(SIGALRM, sampleHandler) == SIG_ERR){
-    fprintf(stderr, "[ERROR] Unable to handle SIGALARM: %s\n", strerror(errno));
+    fprintf(stderr, "Unable to handle SIGALARM: %s\n", strerror(errno));
+    exit(EXIT_FAILURE);
+  }
+
+  // detaching a thread handling the N samples
+  if(pthread_create(&bpm_thread_id, NULL, (void*)bpm_thread, NULL) != 0){
+    fprintf(stderr,"Unable to create thread: %s\n", strerror(errno));
     exit(EXIT_FAILURE);
   }
 
@@ -195,5 +202,5 @@ int main(void)
 
   while(1) pause();
 
-  exit(EXIT_SUCCESS);
+  return 0;
 }
