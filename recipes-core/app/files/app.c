@@ -99,32 +99,32 @@ void* bpm_thread(){
   unsigned short counter = 0;
 
   while(1){
-	  read(fd_pipe[0], &val, sizeof(val)); // it's blocking !
+    read(fd_pipe[0], &val, sizeof(val)); // it's blocking !
 
-	  v[counter].Re = val;
-	  v[counter++].Im = 0;
+    v[counter].Re = val;
+    v[counter++].Im = 0;
 
-	  if(counter == N){ // if all samples gathered
-		  counter = 0;
+    if(counter == N){ // if all samples gathered
+      counter = 0;
 
-		// FFT computation
-		  fft( v, N, scratch );
+      // FFT computation
+      fft( v, N, scratch );
 
-		// PSD computation
-		  for(k = 0; k < N; k++)
-			abs[k] = (50.0/N)*((v[k].Re*v[k].Re)+(v[k].Im*v[k].Im));
+      // PSD computation
+      for(k = 0; k < N; k++)
+	 abs[k] = (50.0/N)*((v[k].Re*v[k].Re)+(v[k].Im*v[k].Im));
 
-		  minIdx = (0.5*N)/50;   // position in the PSD of the spectral line corresponding to 30 bpm
-		  maxIdx = 3*N/50;       // position in the PSD of the spectral line corresponding to 180 bpm
+	 minIdx = (0.5*N)/50;   // position in the PSD of the spectral line corresponding to 30 bpm
+	 maxIdx = 3*N/50;       // position in the PSD of the spectral line corresponding to 180 bpm
 
-		// Find the peak in the PSD from 30 bpm to 180 bpm
-		  m = minIdx;
-		  for(k = minIdx; k < maxIdx; k++)
-			if( abs[k] > abs[m] ) m = k;
+	 // Find the peak in the PSD from 30 bpm to 180 bpm
+	 m = minIdx;
+	 for(k = minIdx; k < maxIdx; k++)
+	    if( abs[k] > abs[m] ) m = k;
 
-		  // Print the heart beat in bpm
-		  printf("bpm: %d\n", m*60*50/N);
-	  }
+	  // Print the heart beat in bpm
+	  printf("bpm: %d\n", m*60*50/N);
+   }
  }
  
   pthread_exit(NULL);
@@ -172,6 +172,7 @@ void sampleHandler(){
   #ifdef DEBUG_MODE
     CAPTURE_TIME(&tv2);
     printf("[time = %f s]\t", get_sample_time(&tv1, &tv2));
+    CAPTURE_TIME(&tv1); 
   #endif 
 
   read(fd, (char*)&(val), sizeof(int)); // reading for mod
@@ -199,8 +200,8 @@ int main(void)
 
   // creating the FIFO shared channel
   if(pipe(fd_pipe) < 0){
-	  fprintf(stderr, "Unable to create FIFO channel: %s\n", strerror(errno));
-	  exit(EXIT_FAILURE);
+    fprintf(stderr, "Unable to create FIFO channel: %s\n", strerror(errno));
+    exit(EXIT_FAILURE);
   }
 
   // attach SIGALARM to Handler
