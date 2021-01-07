@@ -24,6 +24,20 @@
 # define PI	3.14159265358979323846264338327950288
 #endif
 
+/*Uncomment if you want to see samples read printed and their timing*/
+//#define DEBUG_MODE()
+
+
+#ifdef DEBUG_MODE
+  struct timeval tv1, tv2 ;  
+  #define CAPTURE_TIME(tv) gettimeofday(tv, NULL)
+
+  double get_sample_time(struct timeval *tvx, struct timeval *tvy){
+      return (double)(tvy->tv_usec - tvx->tv_usec)/1000000 + 
+              (double)(tvy->tv_sec - tvx->tv_sec) ;
+  }   
+#endif
+
 typedef float real;
 
 typedef struct{ 
@@ -36,7 +50,6 @@ complex v[N];
 pthread_t bpm_thread_id;
 static int fd_pipe[2];
 static int fd = -1;
-unsigned short counter = 0;
 
 
 /**
@@ -83,7 +96,7 @@ void* bpm_thread(){
   float abs[N];
   int k, m, val;
   int minIdx, maxIdx;
-
+  unsigned short counter = 0;
 
   while(1){
 	  read(fd_pipe[0], &val, sizeof(val)); // it's blocking !
@@ -98,19 +111,19 @@ void* bpm_thread(){
 		  fft( v, N, scratch );
 
 		// PSD computation
-		  for(k=0; k<N; k++)
-			abs[k] = (50.0/2048)*((v[k].Re*v[k].Re)+(v[k].Im*v[k].Im));
+		  for(k = 0; k < N; k++)
+			abs[k] = (50.0/N)*((v[k].Re*v[k].Re)+(v[k].Im*v[k].Im));
 
-		  minIdx = (0.5*2048)/50;   // position in the PSD of the spectral line corresponding to 30 bpm
-		  maxIdx = 3*2048/50;       // position in the PSD of the spectral line corresponding to 180 bpm
+		  minIdx = (0.5*N)/50;   // position in the PSD of the spectral line corresponding to 30 bpm
+		  maxIdx = 3*N/50;       // position in the PSD of the spectral line corresponding to 180 bpm
 
 		// Find the peak in the PSD from 30 bpm to 180 bpm
 		  m = minIdx;
-		  for(k=minIdx; k<(maxIdx); k++)
+		  for(k = minIdx; k < maxIdx; k++)
 			if( abs[k] > abs[m] ) m = k;
 
 		  // Print the heart beat in bpm
-		  printf("bpm: %d\n", m*60*50/2048);
+		  printf("bpm: %d\n", m*60*50/N);
 	  }
  }
  
@@ -156,10 +169,17 @@ void setReAlarm(time_t ts){
 void sampleHandler(){ 
   int val ;
 
+  #ifdef DEBUG_MODE
+    CAPTURE_TIME(&tv2);
+    printf("[time = %f s]\t", get_sample_time(&tv1, &tv2));
+  #endif 
+
   read(fd, (char*)&(val), sizeof(int)); // reading for mod
   write(fd_pipe[1], &val, sizeof(val)); // send to thread
 
-  printf("read: %d\n", val);
+  #ifdef DEBUG_MODE
+    printf("read: %d\n", val);
+  #endif
 }
 
 
@@ -167,7 +187,6 @@ void sampleHandler(){
 int main(void)
 {
   char* dev_name = "/dev/ppgmod_dev";
-  printf("Application started\n");
 
   // attacching Ctrl + C to Handler
   signal(SIGINT, SignIntHandler);
@@ -200,6 +219,11 @@ int main(void)
   // set ripetitive alarm every Ts ms
   setReAlarm(Ts);
 
+  #ifdef DEBUG_MODE
+    CAPTURE_TIME(&tv1);
+  #endif 
+
+  printf("Application started\n");
   while(1) pause();
 
   return 0;
