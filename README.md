@@ -150,7 +150,7 @@ struct timeval {
 
 ## Extra: qemuarm
 
-In case you own no real target, use the following script to deploy your application on qemuarm.  **NOTICE: ** qemuarm is far from precise in terms of timing. Do not rely on it if you want to test the application in terms of timing. 
+In case you own no real target, use the following script to deploy your application on qemuarm.**NOTICE:** qemuarm is far from precise in terms of timing. Do not rely on it if you want to test the application in terms of timing. 
 
 ```bash
 #!/bin/bash
