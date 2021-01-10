@@ -14,9 +14,57 @@ The cDD provides access to the virtual PPG sensor. Each time the read function o
 
 ## How to use
 
-Assuming that you already built and setup a ```pocky``` Linux distribution on your machine for RaspberryPi 4 or qemuarm, open up a new terminal and act as follows, according to what target you want to the test it on (rpi or qemuarm).
+Assuming that you already built and setup a ```pocky``` Linux distribution on your machine for RaspberryPi 4 or qemuarm, you can either 
 
-### Raspberry Pi 4
+- use a bash script I wrote to automate the whole process
+- do the whole setup by hand as described in the following sections
+
+### Raspberry PI 4
+
+Assuming your poky directory is located at ```~/``` , create a bash file called ```setup.sh``` 
+
+```bash
+touch ~/setup.sh
+```
+
+and copy the following code in it
+
+**WARNING:** Make sure it fits your system before using. In particular, make sure your output device is actually called ```/dev/sdb``` otherwise modify last line with the appropriate one. Also, if your build directory has a different name, just replace ```build_rpi4``` with the correct one. 
+
+````bash
+#!/bin/bash
+
+cd poky
+git clone https://github.com/PronElle/OSESAssignment
+
+shopt -s expand_aliases
+source oe-init-build-env build_rpi4
+
+bitbake-layers add-layer ../OSESAssignment
+
+echo "IMAGE_INSTALL_append = \" app\"" >> conf/local.conf
+echo "IMAGE_INSTALL_append = \" ppgmod\"" >> conf/local.conf
+echo "KERNEL_MODULE_AUTOLOAD += \"ppgmod\"" >> conf/local.conf
+
+bitbake core-image-full-cmdline
+sudo dd if=tmp/deploy/images/raspberrypi4/core-image-full-cmdline-raspberrypi4.rpi-sdimg of=/dev/sdb bs=1M
+````
+
+Then, make it executable 
+
+```bash
+sudo chmod u+x setup.sh
+```
+
+and run it
+
+```bash
+./setup.sh
+```
+
+After login, type ```app``` to test the application. 
+
+Alternatively, do it by hand as described below.
 
 Reach your ```poky``` root directory
 
@@ -56,41 +104,48 @@ IMAGE_INSTALL_append = " ppgmod"
 KERNEL_MODULE_AUTOLOAD += "ppgmod"
 ```
 
-Then, the layer needs to be added to the Linux distro
-
-```
-vi conf/bblayers.conf
-```
-
-and replace its content with the following lines
-
-```bash
-BBPATH = "${TOPDIR}"
-BBFILES ?= ""
-BBLAYERS ?= " \
-    /home/elle/poky/meta \
-    /home/elle/poky/meta-poky \
-    /home/elle/poky/meta-yocto-bsp \
-    /home/elle/poky/meta-openembedded/meta-oe \
-    /home/elle/poky/meta-openembedded/meta-multimedia \
-    /home/elle/poky/meta-openembedded/meta-networking \
-    /home/elle/poky/meta-openembedded/meta-python \
-    /home/elle/poky/meta-raspberrypi \
-    /home/elle/poky/OSESAssignment \
-    "
-```
-
 Eventually, build the new image
 
 ```bash
 bitbake core-image-full-cmdline
 ```
 
-and test the application running ```app``` from the command user interface.
+now burn the image to the SD Card.
+
+**WARNING:** Make sure your output device is actually called ```/dev/sdb``` otherwise modify ```of=<outdevname>``` properly (check with ```sudo fdisk -l```).
+
+```bash
+sudo dd if=tmp/deploy/images/raspberrypi4/core-image-full-cmdline-raspberrypi4.rpi-sdimg of=/dev/sdb bs=1M
+```
+
+After login,  test the application running ```app``` from the command user interface.
 
 ### qemuarm 
 
-Reach your ```poky``` root directory
+As for the real target, here's a script
+
+```bash
+#!/bin/bash
+
+cd poky
+git clone https://github.com/PronElle/OSESAssignment
+
+shopt -s expand_aliases
+source oe-init-build-env build_qemuarm
+
+bitbake-layers add-layer ../OSESAssignment
+
+echo "IMAGE_INSTALL_append = \" app\"" >> conf/local.conf
+echo "IMAGE_INSTALL_append = \" ppgmod\"" >> conf/local.conf
+echo "KERNEL_MODULE_AUTOLOAD += \"ppgmod\"" >> conf/local.conf
+
+bitbake core-image-minimal
+runqemu qemuarm
+```
+
+Make it executable and run it as described for the rpi4. 
+
+Alternatively, reach your ```poky``` root directory
 
 ```bash
 cd poky
@@ -110,7 +165,7 @@ source oe-init-build-env build_qemuarm
 
 now the layer needs to be added to the configuration
 
-```
+```bash
 bitbake-layers add-layer ../OSESAssignment
 ```
 
@@ -159,6 +214,8 @@ struct timeval {
     suseconds_t tv_usec;        /* microseconds */
 };
 ```
+
+**NOTICE:** qemuarm is not that accurate when it comes to timing. Refer to a real target for better performances. 
 
 ## Why using a pipe 
 
