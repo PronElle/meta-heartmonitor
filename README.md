@@ -35,12 +35,12 @@ and copy the following code in it
 #!/bin/bash
 
 cd poky
-git clone https://github.com/PronElle/OSESAssignment
+git clone https://github.com/PronElle/meta-heartmonitor
 
 shopt -s expand_aliases
 source oe-init-build-env build_rpi4
 
-bitbake-layers add-layer ../OSESAssignment
+bitbake-layers add-layer ../meta-heartmonitor
 
 echo "IMAGE_INSTALL_append = \" heartbeat\"" >> conf/local.conf
 echo "IMAGE_INSTALL_append = \" ppgmod\"" >> conf/local.conf
@@ -77,7 +77,7 @@ cd poky
 then, clone this repository as follows
 
 ```bash
-git clone https://github.com/PronElle/OSESAssignment
+git clone https://github.com/PronElle/meta-heartmonitor
 ```
 
 and initialize the environment
@@ -89,7 +89,7 @@ source oe-init-build-env build_rpi4
 now the layer needs to be added to the configuration
 
 ```
-bitbake-layers add-layer ../OSESAssignment
+bitbake-layers add-layer ../meta-heartmonitor
 ```
 
 At this point, application and the kernel module need to be added to the Linux distro configurations. Edit the following file with your favorite text editor, e.g. ```vi``` 
@@ -157,12 +157,12 @@ In case you own no real target, use the following script to deploy your applicat
 #!/bin/bash
 
 cd poky
-git clone https://github.com/PronElle/OSESAssignment
+git clone https://github.com/PronElle/meta-heartmonitor
 
 shopt -s expand_aliases
 source oe-init-build-env build_qemuarm
 
-bitbake-layers add-layer ../OSESAssignment
+bitbake-layers add-layer ../meta-heartmonitor
 
 echo "IMAGE_INSTALL_append = \" heartbeat\"" >> conf/local.conf
 echo "IMAGE_INSTALL_append = \" ppgmod\"" >> conf/local.conf
