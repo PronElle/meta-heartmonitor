@@ -1,6 +1,6 @@
 # Embedded Linux Assignment - Heart Rate Monitor
 
-The goal of this assignment is implemanting a hearth rate monitor, which is made of two components:
+The goal of this assignment is implementing a heart rate monitor, which is made of two components:
 
 - a Linux character-based driver (cDD) used to access a “virtual” Photopletismography (PPG) sensor
 - a Linux user application (APP)
@@ -42,7 +42,7 @@ source oe-init-build-env build_rpi4
 
 bitbake-layers add-layer ../OSESAssignment
 
-echo "IMAGE_INSTALL_append = \" app\"" >> conf/local.conf
+echo "IMAGE_INSTALL_append = \" heartbeat\"" >> conf/local.conf
 echo "IMAGE_INSTALL_append = \" ppgmod\"" >> conf/local.conf
 echo "KERNEL_MODULE_AUTOLOAD += \"ppgmod\"" >> conf/local.conf
 
@@ -56,13 +56,13 @@ Then, make it executable
 sudo chmod u+x setup.sh
 ```
 
-and run it
+Plug your SD card reader and run the script
 
 ```bash
 ./setup.sh
 ```
 
-Connect via ssh to your rpi (or use a serial to USB cable or HDMI cable plus external monitor) and type ```app``` to test the application. 
+Eventually, connect via ssh to your rpi (or use a serial to USB cable or HDMI cable plus external monitor) and type ```heartbeat``` to test the application. 
 
 Alternatively, do the setup by hand as described below.
 
@@ -101,18 +101,18 @@ vi conf/local.conf
 and add the following lines at the end of the file
 
 ```bash
-IMAGE_INSTALL_append = " app"
+IMAGE_INSTALL_append = " heartbeat"
 IMAGE_INSTALL_append = " ppgmod"
 KERNEL_MODULE_AUTOLOAD += "ppgmod"
 ```
 
-Eventually, build the new image
+and build the new image
 
 ```bash
 bitbake core-image-full-cmdline
 ```
 
-now burn the image to the SD Card.
+Plug the SD card reader in your computer and burn the image to the SD card.
 
 **WARNING:** Make sure your output device is actually called ```/dev/sdb``` otherwise modify ```of=<outdevname>``` properly (check with ```sudo fdisk -l```).
 
@@ -120,7 +120,7 @@ now burn the image to the SD Card.
 sudo dd if=tmp/deploy/images/raspberrypi4/core-image-full-cmdline-raspberrypi4.rpi-sdimg of=/dev/sdb bs=1M
 ```
 
-Eventually, login to your machine (either via ssh, serial port or using an HDMI cable and an external monitor) and  test the application running ```app``` from the command user interface.
+Eventually, login to your machine (either via ssh, serial port or using an HDMI cable and an external monitor) and  test the application running ```heartbeat``` from the command user interface.
 
 ## Timing
 
@@ -146,11 +146,12 @@ struct timeval {
 
 - it embeds a FIFO mechanism, which proves useful as samples keep getting acquired and accumulated even during bpm computation, thus no data get lost;
 - it doesn't require any synchronization mechanism (no semaphores, locks or mutexs) because pipes are blocking, so that a read is performed only when the pipe is not empty;
+- using another thread to read and a semaphore to force it to wait while computing the bpm doesn't allow you to read the sensor while this action is performed. 
 - it's simple, efficient and low in terms of memory occupation.
 
 ## Extra: qemuarm
 
-In case you own no real target, use the following script to deploy your application on qemuarm.**NOTICE:** qemuarm is far from precise in terms of timing. Do not rely on it if you want to test the application in terms of timing. 
+In case you own no real target, use the following script to deploy your application on qemuarm.
 
 ```bash
 #!/bin/bash
@@ -163,7 +164,7 @@ source oe-init-build-env build_qemuarm
 
 bitbake-layers add-layer ../OSESAssignment
 
-echo "IMAGE_INSTALL_append = \" app\"" >> conf/local.conf
+echo "IMAGE_INSTALL_append = \" heartbeat\"" >> conf/local.conf
 echo "IMAGE_INSTALL_append = \" ppgmod\"" >> conf/local.conf
 echo "KERNEL_MODULE_AUTOLOAD += \"ppgmod\"" >> conf/local.conf
 
@@ -171,3 +172,4 @@ bitbake core-image-minimal
 runqemu qemuarm
 ```
 
+**NOTICE:** qemuarm is far from precise in terms of timing. Do not rely on it if you want to test the application from that point of view.

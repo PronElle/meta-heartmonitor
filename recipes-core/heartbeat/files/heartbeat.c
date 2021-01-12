@@ -3,13 +3,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
-
 #include <signal.h>
 #include <sys/time.h>
 #include <pthread.h>
@@ -26,12 +24,13 @@
 //#define DEBUG_MODE()
 
 #ifdef DEBUG_MODE
-struct timeval tv1, tv2;
+#include <string.h>
+struct timeval tv1, tv2, tv3;
 #define CAPTURE_TIME(tv) gettimeofday(tv, NULL)
 
 double get_sample_time(struct timeval *tvx, struct timeval *tvy)
 {
-  return (double)(tvy->tv_usec - tvx->tv_usec) / 1000000 +
+  return (double)(tvy->tv_usec - tvx->tv_usec) / 1000000.0 +
          (double)(tvy->tv_sec - tvx->tv_sec);
 }
 #endif
@@ -44,7 +43,7 @@ typedef struct
   real Im;
 } complex;
 
-/* shared vars */
+
 complex v[N];
 pthread_t bpm_thread_id;
 static int fd_pipe[2];
@@ -107,8 +106,7 @@ void *bpm_thread()
     v[counter].Re = val;
     v[counter++].Im = 0;
 
-    if (counter == N)
-    { // if all samples gathered
+    if (counter == N) { // if all samples gathered
       counter = 0;
 
       // FFT computation
@@ -127,7 +125,7 @@ void *bpm_thread()
         if (abs[k] > abs[m]) m = k;
 
       // Print the heart beat in bpm
-      printf("bpm: %d\n", m * 60 * 50 / N);
+      printf("bpm: %d\n",  m * 60 * 50 / N);
     }
   }
 
@@ -141,8 +139,7 @@ void *bpm_thread()
 void SignIntHandler()
 {
   pthread_cancel(bpm_thread_id);
-  if (fd != -1)
-    close(fd); // if file was actually opened
+  if (fd != -1)  close(fd); // if file was actually opened
 
   printf("Terminating Program\n");
   exit(EXIT_SUCCESS);
@@ -180,8 +177,9 @@ void sampleHandler()
   read(fd, (char *)&(val), sizeof(int)); // reading from mod
 
 #ifdef DEBUG_MODE
-  printf("[time = %f s]\tread: %d\n", get_sample_time(&tv1, &tv2), val);
-  CAPTURE_TIME(&tv1);
+  CAPTURE_TIME(&tv3);
+  printf("[time = %f ms]\tread: %d\n", 1000.0 * get_sample_time(&tv1, &tv2), val);
+  memcpy(&tv1, &tv3, sizeof(tv1));
 #endif
 
   write(fd_pipe[1], &val, sizeof(val)); // send to thread
@@ -201,10 +199,10 @@ int main(void)
     exit(EXIT_FAILURE);
   }
 
-  // creating the FIFO shared channel
+  // creating the pipe
   if (pipe(fd_pipe) < 0)
   {
-    fprintf(stderr, "Unable to create FIFO channel: %s\n", strerror(errno));
+    fprintf(stderr, "Unable to create pipe channel: %s\n", strerror(errno));
     exit(EXIT_FAILURE);
   }
 
@@ -229,7 +227,7 @@ int main(void)
   CAPTURE_TIME(&tv1);
 #endif
 
-  printf("Application started\n");
+  printf("Sampling started\n");
   while (1) pause();
 
   return 0;
