@@ -25,7 +25,6 @@
 //#define DEBUG_MODE()
 
 #ifdef DEBUG_MODE
-#include <string.h>
 struct timeval tv1, tv2, tv3;
 #define CAPTURE_TIME(tv) gettimeofday(tv, NULL)
 
@@ -42,16 +41,16 @@ typedef struct {
   real Im;
 } complex;
 
-complex v[N];
 static int fd_pipe[2]; // pipe file descriptor
 static int fd = -1;   // device file descriptor
 static bool sig_int = false;
 
 /**
- *  @brief evaluates fast Fourier transform
- *  @param v: array of samples
- *  @param n: number of samples
- *  @param tmp
+ *  @brief evaluates fast Fourier transform 
+ *         out of n samples
+ *  @param v:   array of samples
+ *  @param n:   number of samples
+ *  @param tmp: support array
  *  @return None
  **/
 void fft(complex *v, int n, complex *tmp)
@@ -89,10 +88,10 @@ void fft(complex *v, int n, complex *tmp)
 
 /** 
  *  @brief  util to display bpm 
- *  @param  None
+ *  @param  v: array of complex samples 
  *  @return None
  **/ 
-void display_bpm(){
+void display_bpm(const complex *v){
       complex scratch[N];
       float abs[N];
       int k, m;
@@ -117,96 +116,89 @@ void display_bpm(){
       printf("bpm: %d\n",  m * 60 * 50 / N);
 }
 
+
 /** 
- *  @brief thread function to evaluate bpm using fft
+ *  @brief thread function to manage bpm evaluation
+ *         employing bpm and fft utils. Array of samples
+ *         is only managed here (less total mem occupation)
+ *  @param  None
+ *  @return None
 **/
-void *bpm_thread()
-{
-  int val;
+void* bpm_thread(void)
+{ 
+  complex v[N]; // samples only managed here
+  int samp;
   unsigned short counter = 0;
 
   while (!sig_int) 
   {
-    read(fd_pipe[0], &val, sizeof(val)); // it's blocking !
+    read(fd_pipe[0], &samp, sizeof(samp)); // it's blocking !
 
-    v[counter].Re = val;
+    v[counter].Re = samp;
     v[counter++].Im = 0;
 
     if (counter == N) { // if all samples gathered
       counter = 0;
-      display_bpm();
+      display_bpm(v);
     }
   }
 
   pthread_exit(NULL);
 }
 
+
 /**
  *  @brief SIGN_INT Handler (Ctrl + C)
  *         allowing user to stop execution.
+ *  @param  None
  *  @return None
  **/
-void SignIntHandler()
+void SigIntHandler()
 {
   sig_int = true; // safer than killing the thread
   if (fd != -1)  close(fd); // if file was actually opened
 
-  printf("Terminating Program\n");
+  fprintf(stdout, "Terminating Program\n");
   exit(EXIT_SUCCESS);
 }
 
 
 /**
- * @brief SIGALRM Handler: accesses drive file 
- *        to get a sample every 20 ms
+ * @brief SIGALRM Handler: accesses driver file 
+ *        to get a sample every 20 ms and sends it
+ *	  to thread using a pipe (README for more)	
+ * @param None
  * @return None
  **/
 void sampleHandler()
 {
-  int val;
+  int samp;
 
 #ifdef DEBUG_MODE
   CAPTURE_TIME(&tv2);
 #endif
-
-  read(fd, (char *)&(val), sizeof(int)); // reading from mod
+  
+  read(fd, (char *)&(samp), sizeof(int)); // reading from mod
 
 #ifdef DEBUG_MODE
   CAPTURE_TIME(&tv3);
-  printf("[time = %f ms]\tread: %d\n", 1000.0 * get_sample_time(&tv1, &tv2), val);
+  fprintf(stdout, "[time = %f ms]\tread: %d\n", 
+		  1000.0 * get_sample_time(&tv1, &tv2), val);
   memcpy(&tv1, &tv3, sizeof(tv1));
 #endif
 
-  write(fd_pipe[1], &val, sizeof(val)); // send to thread
+  write(fd_pipe[1], &samp, sizeof(samp)); // sending to thread
 }
 
-/**
- * @brief  signals handler callback
- * @param  signal to be handled
- * @return None
- **/
-void global_handler(const int signal){
-  switch(signal)
-  {
-    case SIGINT:
-      SignIntHandler();
-      break;
-    case SIGALRM:
-      sampleHandler();
-      break;
-    default:
-      break;
-  }
-}
 
 /**
- *  @brief set a new signal handler action for a given signal
+ *  @brief callback to attach given signal to given handler
  *  @param signal to be attached to handler
- *  @param sigaction struct
+ *  @param handler function pointer
  *  @return None
  **/
-static inline void setSigaction(int sig, struct sigaction *action){
-  if(sigaction(sig, action, NULL) == -1){
+static inline void setSignal(int sig, void (*handler)(int)){
+  if(signal(sig, handler) == SIG_ERR){
     fprintf(stderr, "Unable to handle %d: %s\n", sig, strerror(errno));
     exit(EXIT_FAILURE);
   }
@@ -237,15 +229,9 @@ int main(void)
   char *dev_name = "/dev/ppgmod_dev";
   pthread_t bpm_thread_id;
 
-  // signals handling setup
-  struct sigaction action; 
-  action.sa_handler = global_handler;
-  sigemptyset(&action.sa_mask);
-  action.sa_flags = 0;
-
   // attacching Ctrl + C to Handler
-  setSigaction(SIGINT, &action);
-
+  setSignal(SIGINT, SigIntHandler);
+ 
   // opening driver file
   if ((fd = open(dev_name, O_RDWR)) < 0)
   {
@@ -261,7 +247,7 @@ int main(void)
   }
 
   // attach SIGALARM to Handler
-  setSigaction(SIGALRM, &action);
+  setSignal(SIGALRM, sampleHandler);
 
   // detaching a thread handling the N samples
   if (pthread_create(&bpm_thread_id, NULL, (void *)bpm_thread, NULL) != 0)
@@ -270,7 +256,7 @@ int main(void)
     exit(EXIT_FAILURE);
   }
 
-  // set ripetitive alarm every Ts ms
+  // set ripetitive alarm every Ts us
   setReAlarm(Ts);
 
 #ifdef DEBUG_MODE
