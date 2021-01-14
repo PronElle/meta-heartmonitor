@@ -91,7 +91,7 @@ void fft(complex *v, int n, complex *tmp)
  *  @param  v: array of complex samples 
  *  @return None
  **/ 
-void display_bpm(const complex *v){
+void display_bpm(complex *v){
       complex scratch[N];
       float abs[N];
       int k, m;
@@ -183,7 +183,7 @@ void sampleHandler()
 #ifdef DEBUG_MODE
   CAPTURE_TIME(&tv3);
   fprintf(stdout, "[time = %f ms]\tread: %d\n", 
-		  1000.0 * get_sample_time(&tv1, &tv2), val);
+		  1000.0 * get_sample_time(&tv1, &tv2), samp);
   memcpy(&tv1, &tv3, sizeof(tv1));
 #endif
 
