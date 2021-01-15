@@ -21,10 +21,10 @@ Assuming you already built and setup a ```pocky``` Linux distribution on your ma
 
 In both cases, make sure that
 
-your ```conf/bblayers.conf``` looks like this  
+- your ```conf/bblayers.conf``` looks like this
 
-- ```bash
-  # POKY_BBLAYERS_CONF_VERSION is increased each time build/conf/bblayers.conf 
+  ```bash
+  #POKY_BBLAYERS_CONF_VERSION is increased each time build/conf/bblayers.conf 
   # changes incompatibly
   POKY_BBLAYERS_CONF_VERSION = "2"
   
@@ -42,6 +42,8 @@ your ```conf/bblayers.conf``` looks like this
     /home/elle/poky/meta-raspberrypi \
     "
   ```
+
+  
 
 - your ```conf/local.conf``` file contains the following lines 
 
