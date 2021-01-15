@@ -17,7 +17,43 @@ The cDD provides access to the virtual PPG sensor. Each time the read function o
 Assuming you already built and setup a ```pocky``` Linux distribution on your machine for Raspberry PI 4 (or any other version) , you can either 
 
 - use a bash script I wrote to automate the whole process
-- do the whole setup by hand as described in the following sections
+- do the whole setup by hand as instructed in the following sections
+
+In both cases, make sure that
+
+your ```conf/bblayers.conf``` looks like this  
+
+- ```bash
+  # POKY_BBLAYERS_CONF_VERSION is increased each time build/conf/bblayers.conf 
+  # changes incompatibly
+  POKY_BBLAYERS_CONF_VERSION = "2"
+  
+  BBPATH = "${TOPDIR}" 
+  BBFILES ?= ""
+  
+  BBLAYERS ?= " \
+    /home/elle/poky/meta \
+    /home/elle/poky/meta-poky \
+    /home/elle/poky/meta-yocto-bsp \
+    /home/elle/poky/meta-openembedded/meta-oe \
+    /home/elle/poky/meta-openembedded/meta-multimedia \
+    /home/elle/poky/meta-openembedded/meta-networking \
+    /home/elle/poky/meta-openembedded/meta-python \
+    /home/elle/poky/meta-raspberrypi \
+    "
+  ```
+
+- your ```conf/local.conf``` file contains the following lines 
+
+  ```bash
+  MACHINE ?= "raspberrypi4"
+  ENABLE_UART = "1"
+  
+  EXTRA_IMAGE_FEATURES += "debug-tweaks tools-debug eclipse-debug ssh-server-openssh"
+  IMAGE_INSTALL_append = " linux-firmware-rpidistro-bcm43455"
+  IMAGE_FSTYPES = "tar.xz ext3 rpi-sdimg"
+  
+  ```
 
 ### Bash script based setup
 
@@ -140,7 +176,7 @@ struct timeval {
 };
 ```
 
-
+The relative error obtained on Raspberry PI 4 is  around 0.1%.
 
 ## Why using a pipe 
 
